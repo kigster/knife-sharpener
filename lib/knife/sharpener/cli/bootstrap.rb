@@ -1,5 +1,4 @@
 require 'mixlib/cli'
-require 'pry'
 
 module Knife
   class Sharpener::CLI::Bootstrap < Sharpener::CLI
