@@ -1,4 +1,6 @@
-# Knife Cloud Sharpener 
+[![Build Status](https://travis-ci.org/kigster/knife-sharpener.svg?branch=master)](https://travis-ci.org/kigster/knife-sharpener)
+
+# Knife Sharpener 
 
 This tool generates provisioning commands in the Knife cloud environment, based on rules defined in a convenient yml file. 
 
