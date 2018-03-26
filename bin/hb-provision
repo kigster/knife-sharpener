@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+
+#
+# ```bash
+# bin/deploy/provision -n web001-a -e staging -a us-west-2a -r 'role[homebase-web]' -f t2.large -s sg-62e1991d
+# bin/deploy/provision -n job001-a -e staging -a us-west-2a -r 'role[homebase-job]' -f t2.large -s sg-62e1991d
+#
+# bin/deploy/provision -n web001-b -e staging -a us-west-2b -r 'role[homebase-web]' -f t2.large -s sg-62e1991d
+# bin/deploy/provision -n job001-b -e staging -a us-west-2b -r 'role[homebase-job]' -f t2.large -s sg-62e1991d
+#
+#
+# command = "knife ec2 server create #{final_options.join(' ')}"
+
+# ```
+
+require 'optparse'
+
+#unless system('chef gem list | grep knife-ec2 > /dev/null')
+#  puts 'Missing required gem, knife-ec2. Installing!'
+#  system('chef gem install knife-ec2 -v 0.17.0')
+#end
+
+PUBLIC_SUBNETS = {
+  'us-west-2a' => 'subnet-960966f0',
+  'us-west-2b' => 'subnet-844ec2cc'
+}.freeze
+
+PRIVATE_SUBNETS = {
+  'us-west-2a' => 'subnet-a30f60c5',
+  'us-west-2b' => 'subnet-88b13dc0'
+}.freeze
+
+AVAILABILITY_ZONES = %w(us-west-2a us-west-2b).freeze
+
+REQUIRED_OPTIONS = %i(availability_zone environment node_name).freeze
+
+options = {
+  image: 'ami-0a00ce72', # Amazon's Ubuntu 16.04 base image
+  flavor: 't2.small',
+  ssh_user: 'ubuntu',
+  identity_file: '~/.ssh/g3root.pem',
+  ssh_key: 'g3.root',
+  public: false,
+  security_group_id: 'sg-7bdaa606', # Default security group for G3
+  run_list: %w(role[homebase-base])
+}
+
+parser = OptionParser.new do |opts|
+  opts.on('-i', '--image [image]', 'Amazon Machine Image (AMI), e.g. ami-0a00ce72') do |image|
+    options[:image] = image
+  end
+  opts.on('-f', '--flavor [flavor]', 'Instance type, e.g. t2.small') do |flavor|
+    options[:flavor] = flavor
+  end
+  opts.on('-a', '--availability-zone AVAILABILITY_ZONE', "One of: #{AVAILABILITY_ZONES.join(', ')}") do |availability_zone|
+    options[:availability_zone] = availability_zone
+  end
+  opts.on('-p', '--public', 'Should the instance get created in a public or private subnet?') do |public|
+    options[:public] = public
+  end
+  opts.on('-e', '--environment ENVIRONMENT', 'Environment, e.g. staging') do |environment|
+    options[:environment] = environment
+  end
+  opts.on('-n', '--node-name NODE_NAME', 'The name of the node') do |node_name|
+    options[:node_name] = node_name
+  end
+  opts.on('-s', '--security-group [security_group]', 'The security group, e.g. sg-5721132a') do |security_group_id|
+    options[:security_group_id] = security_group_id
+  end
+  opts.on('-r', '--run-list [run_list]', Array, 'The run list, e.g. role[homebase-lb]. All instances will get provisioned with role[homebase-base] so this can be omitted') do |run_list|
+    options[:run_list] += run_list
+  end
+  opts.on('-h', '--help', 'Show help') do
+    puts opts
+    exit(0)
+  end
+end
+
+parser.parse!
+
+valid = true
+
+REQUIRED_OPTIONS.each do |option|
+  unless options.key?(option)
+    puts "#{option} is required!"
+    valid = false
+  end
+end
+
+unless valid
+  puts '----------------------'
+  puts parser.help
+  exit(1)
+end
+
+begin
+  availability_zone = options.delete(:availability_zone)
+  options[:subnet] = if options.delete(:public)
+    PUBLIC_SUBNETS.fetch(availability_zone)
+  else
+    PRIVATE_SUBNETS.fetch(availability_zone)
+  end
+rescue KeyError
+  puts "#{availability_zone} is not a valid availability zone. Must be one of: #{AVAILABILITY_ZONES.join(', ')}"
+  exit(1)
+end
+
+final_options = options.map do |name, value|
+  value = value.is_a?(Array) ? value.join(',') : value
+  "--#{name.to_s.tr('_', '-')} '#{value}'"
+end
+
+puts 'About to create the following instance:'
+
+options.each do |name, value|
+  puts "#{name}: #{value}"
+end
+
+puts 'Continue? (Y/N)'
+
+if gets.downcase.chomp != 'y'
+  puts 'Aborting!'
+  exit(0)
+end
+
+command = "knife ec2 server create #{final_options.join(' ')}"
+
+puts 'Running the following command:'
+puts command
+
+#system command

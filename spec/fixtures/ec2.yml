@@ -1,0 +1,41 @@
+global:
+  environment: staging
+  host_suffix: staging
+  log_dir: ./tmp
+  ssh_user: ubuntu
+
+configurations:
+  ec2-base: &ec2-base
+    image: ami-d0gf009
+    flavor: c5.2xlarge
+    security_group_id: ssg-9g0981934
+    ssh_user: ubuntu
+    ssh_key: id_rsa
+    identity_file: '~/.ssh/root.pem'
+    run_list: 'role[base]'
+  web: &ec2-web
+    <<: *ec2-base
+    run_list: 'role[base],role[web]'
+    host_sequence: 1..1
+  job: &ec2-job
+    <<: *ec2-base
+    run_list: 'role[base],role[job]'
+    host_sequence: 1..1
+
+templates:
+  web2a:
+    <<: *ec2-web
+    subnet: subnet-f909898f
+    host_prefix: web2a
+  web-2b:
+    <<: *ec2-web
+    subnet: subnet-f909898f
+    host_prefix: web2b
+  job2a:
+    <<: *ec2-job
+    subnet: subnet-f909898f
+    host_prefix: job2a
+  job2b:
+    <<: *ec2-job
+    subnet: subnet-88b13dc0
+    host_prefix: job2b

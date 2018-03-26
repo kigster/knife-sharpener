@@ -1,0 +1,26 @@
+require 'spec_helper'
+
+describe Knife::Sharpener::HostIP do
+  describe '.ip_for' do
+    let(:header) { "ID                                    Name                                    State    Type                              Flavor                        IPs                                   RAM      Disk  ssh_key\n" }
+    let(:server001) { "a67c6340-4bf4-11e3-8f96-0800200c9a66 app001.stage running   smartmachine    g3-highmemory-17.125-smartos 1.1.1.1   17.12 GB    420 GB\n" }
+    let(:server002) { "eb332d70-4bf4-11e3-8f96-0800200c9a66 app002.stage running smartmachine    g3-highmemory-17.125-smartos 1.1.1.2   17.12 GB    420 GB\n" }
+    let(:server003) { "eb332d70-4bf4-11e3-8f96-0800200c9a66 app003.stage running smartmachine    g3-highmemory-17.125-smartos 1.1.1.3,1.1.1.4   17.12 GB    420 GB\n" }
+    let(:servers) { [header, server001, server002, server003].join }
+
+    before do
+      double_cmd('knife ec2 server list', puts: servers)
+    end
+
+    it 'returns the IP address given a hostname' do
+      expect(Knife::Sharpener::HostIP.ip_for('app001.stage')).to eq('1.1.1.1')
+      expect(Knife::Sharpener::HostIP.ip_for('app002.stage')).to eq('1.1.1.2')
+    end
+
+    context 'server has multiple IPs' do
+      it 'returns the first IP' do
+        expect(Knife::Sharpener::HostIP.ip_for('app003.stage')).to eq('1.1.1.3')
+      end
+    end
+  end
+end
